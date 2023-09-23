@@ -1,128 +1,85 @@
+from stellar import StellarUnicorn
+from picographics import PicoGraphics, DISPLAY_STELLAR_UNICORN
+import time
 import math
 
-import pygame
-from pygame.locals import (
-    K_LEFT,
-    K_RIGHT,
-    K_ESCAPE,
-    KEYDOWN,
-    QUIT
-)
-
-pygame.init()
-
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
-
-screen = pygame.display.set_mode([SCREEN_WIDTH, SCREEN_HEIGHT])
+graphics = PicoGraphics(display=DISPLAY_STELLAR_UNICORN)
+stellar_unicorn = StellarUnicorn()
 
 
-class Player(pygame.sprite.Sprite):
-    def __init__(self, starting_position: tuple):
-        super(Player, self).__init__()
-        self.surf = pygame.Surface((75, 25))
-        self.surf.fill((255, 255, 255))
-        self.rect = self.surf.get_rect()
-        self.rect.center = starting_position
-
-    def update(self, pressed_keys: dict):
-        if pressed_keys[K_LEFT]:
-            self.rect.move_ip(-5, 0)
-        elif pressed_keys[K_RIGHT]:
-            self.rect.move_ip(5, 0)
-
-        if self.rect.left < 0:
-            self.rect.left = 0
-        if self.rect.right > SCREEN_WIDTH:
-            self.rect.right = SCREEN_WIDTH
-
-    def update(self, center_position: tuple):
-        self.rect.move_ip(center_position)
+BLACK = graphics.create_pen(0, 0, 0)
+WHITE = graphics.create_pen(255, 255, 255)
 
 
-class Ball(pygame.sprite.Sprite):
-    def __init__(self, initial_direction: tuple, speed: int):
-        super(Ball, self).__init__()
-        self.surf = pygame.Surface((20, 20))
-        self.surf.fill((255, 255, 255))
-        self.rect = self.surf.get_rect()
-        self.rect.center = ((SCREEN_WIDTH-surf.get_width())/2,
-                            (SCREEN_HEIGHT-surf.get_height())/2)
-        self.direction = initial_direction
+class Player:
+    def __init__(self, initial_x, up_button, down_button):
+        self.height = 4
+        self.y_top = 6
+        self.x = initial_x
+        self.up_button = up_button
+        self.down_button = down_button
+
+    def handle_button_press(self, stellar_unicorn):
+        if stellar_unicorn.is_pressed(self.up_button):
+            if self.y_top != 0:
+                self.y_top -= 1
+        elif stellar_unicorn.is_pressed(self.down_button):
+            if self.y_top + self.height != StellarUnicorn.HEIGHT:
+                self.y_top += 1
+
+    def position(self):
+        return (self.x, self.y_top, self.x, self.y_top + self.height)
+
+
+class Ball:
+    def __init__(self, initial_position, initial_direction, speed):
+        self.x = initial_position[0]
+        self.y = initial_position[1]
+        self.x_direction = initial_direction[0]
+        self.y_direction = initial_direction[1]
         self.speed = speed
 
-    def update(self):
-        normalisation_constant = (
-            self.speed /
-            math.sqrt(self.direction[0] ** 2 + self.direction[1] ** 2)
+    def update_position(self):
+        normalisation_constant = self.speed / math.sqrt(
+            self.x_direction ** 2 + self.y_direction ** 2
         )
 
-        normalised_x = round(normalisation_constant * self.direction[0])
-        normalised_y = round(normalisation_constant * self.direction[1])
+        delta_x = round(normalisation_constant * self.x_direction)
+        delta_y = round(normalisation_constant * self.y_direction)
 
-        self.rect.move_ip(
-            normalised_x,
-            normalised_y
-        )
+        self.x += delta_x
+        self.y += delta_y
 
-    def get_position(self):
-        return self.rect.center
+    def position(self):
+        return (self.x, self.y)
 
 
-clock = pygame.time.Clock()
+ball = Ball((int(StellarUnicorn.WIDTH / 2), int(StellarUnicorn.HEIGHT / 2)), (1, 1), 1)
 
-surf = pygame.Surface((50, 50))
-surf.fill((0, 0, 0))
-rect = surf.get_rect()
+players = [
+    Player(0, StellarUnicorn.SWITCH_A, StellarUnicorn.SWITCH_B),
+    Player(
+        StellarUnicorn.WIDTH - 1,
+        StellarUnicorn.SWITCH_VOLUME_UP,
+        StellarUnicorn.SWITCH_VOLUME_DOWN,
+    ),
+]
 
-surf_center_x = (SCREEN_WIDTH-surf.get_width())/2
-surf_center_y = (SCREEN_HEIGHT-surf.get_height())/2
-starting_y_offset = (SCREEN_HEIGHT*0.4)
+while True:
+    graphics.set_pen(BLACK)
+    graphics.clear()
 
-player = Player((surf_center_x, surf_center_y + starting_y_offset))
-computer = Player((surf_center_x, surf_center_y - starting_y_offset))
-ball = Ball((1, 1), 1)
+    # draw the text
+    graphics.set_pen(WHITE)
 
-all_sprites = pygame.sprite.Group()
-[all_sprites.add(p) for p in [player, computer, ball]]
+    ball.update_position()
+    graphics.rectangle(ball.x, ball.y, 1, 1)
 
-bats = pygame.sprite.Group()
-[bats.add(b) for b in [player, computer]]
+    for player in players:
+        player.handle_button_press(stellar_unicorn)
+        graphics.line(*player.position())
 
-balls = pygame.sprite.Group()
-balls.add(ball)
+    # update the display
+    stellar_unicorn.update(graphics)
 
-screen.fill((0, 0, 0))
-
-running = True
-
-while running:
-    for event in pygame.event.get():
-        if event.type == QUIT:
-            running = False
-
-        if event.type == KEYDOWN:
-            if event.key == K_ESCAPE:
-                running = False
-
-    pressed_keys = pygame.key.get_pressed()
-    player.update(pressed_keys)
-    # print(ball.get_position())
-    computer.update(ball.get_position())
-
-    ball.update()
-
-    screen.fill((0, 0, 0))
-
-    for entity in all_sprites:
-        screen.blit(entity.surf, entity.rect)
-
-    if pygame.sprite.spritecollideany(ball, bats):
-        ball.direction = (ball.direction[0] * -1, ball.direction[1] * -1)
-
-    pygame.display.flip()
-
-    clock.tick(60)
-
-
-pygame.quit()
+    time.sleep(0.2)
