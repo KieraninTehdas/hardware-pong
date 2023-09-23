@@ -2,6 +2,7 @@ from stellar import StellarUnicorn
 from picographics import PicoGraphics, DISPLAY_STELLAR_UNICORN
 import time
 import math
+import random
 
 graphics = PicoGraphics(display=DISPLAY_STELLAR_UNICORN)
 stellar_unicorn = StellarUnicorn()
@@ -37,12 +38,30 @@ class Player:
 
 
 class Ball:
-    def __init__(self, initial_position, initial_direction, speed):
-        self.x = initial_position[0]
-        self.y = initial_position[1]
-        self.x_direction = initial_direction[0]
-        self.y_direction = initial_direction[1]
+    def __init__(self, initial_position, speed):
+        self.initial_position = initial_position
         self.speed = speed
+        self.reset()
+
+    def reset_direction(self):
+        if random.random() >= 0.5:
+            self.x_direction = 1
+        else:
+            self.x_direction = -1
+
+        y_random = random.random()
+
+        if y_random > 0.55:
+            self.y_direction = 1
+        elif y_random < 45:
+            self.y_direction = -1
+        else:
+            self.y_direction = 0
+
+    def reset(self):
+        self.x = self.initial_position[0]
+        self.y = self.initial_position[1]
+        self.reset_direction()
 
     def next_position(self):
         normalisation_constant = self.speed / math.sqrt(
@@ -74,14 +93,26 @@ class Ball:
 def find_colliding_player(ball, players):
     next_ball_position = ball.next_position()
 
+    maybe_colliding_player = None
+
     if next_ball_position[0] == 0:
-        return players[0]
+        maybe_colliding_player = players[0]
 
     if next_ball_position[0] == StellarUnicorn.WIDTH - 1:
-        return players[1]
+        maybe_colliding_player = players[1]
+
+    if maybe_colliding_player is None:
+        return
+
+    if (
+        maybe_colliding_player.y_top
+        <= next_ball_position[1]
+        <= maybe_colliding_player.y_top + maybe_colliding_player.height
+    ):
+        return maybe_colliding_player
 
 
-ball = Ball((int(StellarUnicorn.WIDTH / 2), int(StellarUnicorn.HEIGHT / 2)), (1, 0), 1)
+ball = Ball((int(StellarUnicorn.WIDTH / 2), int(StellarUnicorn.HEIGHT / 2)), 1)
 
 players = [
     Player(0, StellarUnicorn.SWITCH_A, StellarUnicorn.SWITCH_B),
@@ -91,6 +122,8 @@ players = [
         StellarUnicorn.SWITCH_VOLUME_DOWN,
     ),
 ]
+
+winner = None
 
 while True:
     graphics.set_pen(BLACK)
@@ -114,6 +147,14 @@ while True:
 
     if next_ball_y_position < 0 or next_ball_y_position > StellarUnicorn.HEIGHT - 1:
         ball.handle_edge_collision()
+
+    next_ball_x_position = ball.next_position()[0]
+    if next_ball_x_position < 0:
+        ball.reset()
+        winner = "Player 2"
+    elif next_ball_x_position > StellarUnicorn.WIDTH - 1:
+        winner = "Player 1"
+        ball.reset()
 
     # update the display
     stellar_unicorn.update(graphics)
