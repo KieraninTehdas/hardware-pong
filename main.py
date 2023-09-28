@@ -12,6 +12,12 @@ BLACK = graphics.create_pen(0, 0, 0)
 WHITE = graphics.create_pen(255, 255, 255)
 
 
+class PlayerControls:
+    def __init__(self, up_button: str, down_button: str):
+        self.up_button = up_button
+        self.down_button = down_button
+
+
 class Player:
     def __init__(self, initial_x, up_button, down_button):
         self.height = 4
@@ -90,40 +96,50 @@ class Ball:
         return (self.x, self.y)
 
 
-def find_colliding_player(ball, players):
-    next_ball_position = ball.next_position()
+class Game:
+    def __init__(self, game_width, game_height, player_1_controls, player_2_controls):
+        self.ball = Ball((int(game_width / 2), int(game_height / 2)), 1)
 
-    maybe_colliding_player = None
+        self.players = [
+            Player(0, player_1_controls.up_button, player_1_controls.down_button),
+            Player(
+                game_height - 1,
+                player_2_controls.up_button,
+                player_2_controls.down_button,
+            ),
+        ]
 
-    if next_ball_position[0] == 0:
-        maybe_colliding_player = players[0]
+        self.winner = None
 
-    if next_ball_position[0] == StellarUnicorn.WIDTH - 1:
-        maybe_colliding_player = players[1]
+    def find_colliding_player(self, ball, players):
+        next_ball_position = ball.next_position()
 
-    if maybe_colliding_player is None:
-        return
+        maybe_colliding_player = None
 
-    if (
-        maybe_colliding_player.y_top
-        <= next_ball_position[1]
-        <= maybe_colliding_player.y_top + maybe_colliding_player.height
-    ):
-        return maybe_colliding_player
+        if next_ball_position[0] == 0:
+            maybe_colliding_player = players[0]
+
+        if next_ball_position[0] == StellarUnicorn.WIDTH - 1:
+            maybe_colliding_player = players[1]
+
+        if maybe_colliding_player is None:
+            return
+
+        if (
+            maybe_colliding_player.y_top
+            <= next_ball_position[1]
+            <= maybe_colliding_player.y_top + maybe_colliding_player.height
+        ):
+            return maybe_colliding_player
 
 
-ball = Ball((int(StellarUnicorn.WIDTH / 2), int(StellarUnicorn.HEIGHT / 2)), 1)
+game = Game(
+    StellarUnicorn.WIDTH,
+    StellarUnicorn.HEIGHT,
+    PlayerControls(StellarUnicorn.SWITCH_A, StellarUnicorn.SWITCH_B),
+    PlayerControls(StellarUnicorn.SWITCH_VOLUME_UP, StellarUnicorn.SWITCH_VOLUME_DOWN),
+)
 
-players = [
-    Player(0, StellarUnicorn.SWITCH_A, StellarUnicorn.SWITCH_B),
-    Player(
-        StellarUnicorn.WIDTH - 1,
-        StellarUnicorn.SWITCH_VOLUME_UP,
-        StellarUnicorn.SWITCH_VOLUME_DOWN,
-    ),
-]
-
-winner = None
 
 while True:
     graphics.set_pen(BLACK)
@@ -132,29 +148,29 @@ while True:
     # draw the text
     graphics.set_pen(WHITE)
 
-    ball.update_position()
-    graphics.rectangle(ball.x, ball.y, 1, 1)
+    game.ball.update_position()
+    graphics.rectangle(game.ball.x, game.ball.y, 1, 1)
 
-    for player in players:
+    for player in game.players:
         player.handle_button_press(stellar_unicorn)
         graphics.line(*player.position())
 
-    colliding_player = find_colliding_player(ball, players)
+    colliding_player = game.find_colliding_player(game.ball, game.players)
     if colliding_player:
-        ball.handle_collision(colliding_player.moving_direction)
+        game.ball.handle_collision(colliding_player.moving_direction)
 
-    next_ball_y_position = ball.next_position()[1]
+    next_ball_y_position = game.ball.next_position()[1]
 
     if next_ball_y_position < 0 or next_ball_y_position > StellarUnicorn.HEIGHT - 1:
-        ball.handle_edge_collision()
+        game.ball.handle_edge_collision()
 
-    next_ball_x_position = ball.next_position()[0]
-    if next_ball_x_position < 0:
-        ball.reset()
-        winner = "Player 2"
-    elif next_ball_x_position > StellarUnicorn.WIDTH - 1:
-        winner = "Player 1"
-        ball.reset()
+    next_ball_x_position = game.ball.next_position()[0]
+    if next_ball_x_position < -1:
+        game.ball.reset()
+        time.sleep(1)
+    elif next_ball_x_position > StellarUnicorn.WIDTH:
+        game.ball.reset()
+        time.sleep(1)
 
     # update the display
     stellar_unicorn.update(graphics)
