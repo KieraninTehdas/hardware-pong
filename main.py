@@ -6,6 +6,7 @@ import random
 
 graphics = PicoGraphics(display=DISPLAY_STELLAR_UNICORN)
 stellar_unicorn = StellarUnicorn()
+stellar_unicorn.set_brightness(0.5)
 
 
 BLACK = graphics.create_pen(0, 0, 0)
@@ -19,12 +20,12 @@ class PlayerControls:
 
 
 class Player:
-    def __init__(self, initial_x, up_button, down_button):
+    def __init__(self, initial_x, controls: PlayerControls):
         self.height = 4
         self.y_top = 6
         self.x = initial_x
-        self.up_button = up_button
-        self.down_button = down_button
+        self.up_button = controls.up_button
+        self.down_button = controls.down_button
         self.moving_direction = 0
 
     def handle_button_press(self, stellar_unicorn):
@@ -44,8 +45,9 @@ class Player:
 
 
 class Ball:
-    def __init__(self, initial_position, speed):
-        self.initial_position = initial_position
+    def __init__(self, spawn_box_ranges, speed):
+        self.spawn_box_x_range = spawn_box_ranges[0]
+        self.spawn_box_y_range = spawn_box_ranges[1]
         self.speed = speed
         self.reset()
 
@@ -65,8 +67,8 @@ class Ball:
             self.y_direction = 0
 
     def reset(self):
-        self.x = self.initial_position[0]
-        self.y = self.initial_position[1]
+        self.x = random.randint(*self.spawn_box_x_range)
+        self.y = random.randint(*self.spawn_box_y_range)
         self.reset_direction()
 
     def next_position(self):
@@ -98,15 +100,13 @@ class Ball:
 
 class Game:
     def __init__(self, game_width, game_height, player_1_controls, player_2_controls):
-        self.ball = Ball((int(game_width / 2), int(game_height / 2)), 1)
+        spawn_box_x_range = (6, game_width - 6)
+        spawn_box_y_range = (6, game_height - 6)
+        self.ball = Ball((spawn_box_x_range, spawn_box_y_range), 1)
 
         self.players = [
-            Player(0, player_1_controls.up_button, player_1_controls.down_button),
-            Player(
-                game_height - 1,
-                player_2_controls.up_button,
-                player_2_controls.down_button,
-            ),
+            Player(0, player_1_controls),
+            Player(game_height - 1, player_2_controls),
         ]
 
         self.winner = None
@@ -133,6 +133,26 @@ class Game:
             return maybe_colliding_player
 
 
+class GameSurface:
+    def __init__(self, stellar_unicorn: StellarUnicorn, graphics: PicoGraphics):
+        self.stellar_unicorn = stellar_unicorn
+        self.graphics = graphics
+
+    def prepare(self):
+        graphics.set_pen(BLACK)
+        graphics.clear()
+        graphics.set_pen(WHITE)
+
+    def ball_sprite(self, ball):
+        graphics.rectangle(ball.x, ball.y, 1, 1)
+
+    def player_sprite(self, player):
+        graphics.line(*player.position())
+
+    def is_pressed_button(self, button):
+        stellar_unicorn.is_pressed(button)
+
+
 game = Game(
     StellarUnicorn.WIDTH,
     StellarUnicorn.HEIGHT,
@@ -145,7 +165,6 @@ while True:
     graphics.set_pen(BLACK)
     graphics.clear()
 
-    # draw the text
     graphics.set_pen(WHITE)
 
     game.ball.update_position()
